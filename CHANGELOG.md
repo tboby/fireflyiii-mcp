@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `FIREFLY_PUBLIC_URL` allows browser OAuth authorization to use a public Firefly URL while API and token requests use the internal `FIREFLY_URL`.
+- `MCP_BACKCHANNEL_BASE_URL` advertises separate token and registration URLs for clients that cannot reach the public MCP hostname.
 
 ## [1.0.0-alpha.1] - 2026-10-29
 

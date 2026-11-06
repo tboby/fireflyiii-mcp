@@ -108,6 +108,50 @@ describe('createOAuthHandler — metadata endpoint', () => {
   });
 });
 
+describe('createOAuthHandler — back-channel discovery', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('advertises internal token and registration endpoints while keeping browser URLs public', async () => {
+    vi.stubEnv('MCP_BASE_URL', 'https://mcp.example.com');
+    vi.stubEnv('MCP_BACKCHANNEL_BASE_URL', 'http://fireflyiii-mcp:3000/');
+    const handler = createOAuthHandler('http://firefly-app:8080', 'client-id', vi.fn());
+    const res = mockRes();
+    await handler(
+      mockReq('GET', '/.well-known/oauth-authorization-server') as http.IncomingMessage,
+      res as unknown as http.ServerResponse,
+    );
+    const metadata = JSON.parse(res.body);
+    expect(metadata.issuer).toBe('https://mcp.example.com');
+    expect(metadata.authorization_endpoint).toBe('https://mcp.example.com/oauth/authorize');
+    expect(metadata.token_endpoint).toBe('http://fireflyiii-mcp:3000/oauth/token');
+    expect(metadata.registration_endpoint).toBe('http://fireflyiii-mcp:3000/oauth/register');
+
+    const authRes = mockRes();
+    await handler(
+      mockReq('GET', '/oauth/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback') as http.IncomingMessage,
+      authRes as unknown as http.ServerResponse,
+    );
+    expect(new URL(authRes.writtenHeaders.Location as string).searchParams.get('redirect_uri')).toBe(
+      'https://mcp.example.com/oauth/callback',
+    );
+  });
+
+  it.each(['not-a-url', 'ftp://internal', 'http://user:secret@internal', 'http://internal?x=1', 'http://internal#x'])(
+    'rejects invalid back-channel base URL (%s)',
+    (url) => {
+      vi.stubEnv('MCP_BACKCHANNEL_BASE_URL', url);
+      expect(() => createOAuthHandler('http://firefly-app:8080', 'client-id', vi.fn())).toThrow(
+        /^MCP_BACKCHANNEL_BASE_URL must be/,
+      );
+    },
+  );
+
+  it('ignores the back-channel setting in PAT-only mode', () => {
+    vi.stubEnv('MCP_BACKCHANNEL_BASE_URL', 'bad-url');
+    expect(() => createOAuthHandler('http://firefly-app:8080', undefined, vi.fn())).not.toThrow();
+  });
+});
+
 describe('createOAuthHandler — authorize proxy', () => {
   it('302s to Firefly III with stable redirect_uri substituted', async () => {
     const mcpHandler = vi.fn();

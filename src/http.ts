@@ -199,6 +199,27 @@ export function createOAuthHandler(
     authorizationBaseUrl = parsed.toString().replace(/\/+$/, '');
   }
 
+  let backchannelBaseUrl: string | undefined;
+  const backchannelUrl = process.env.MCP_BACKCHANNEL_BASE_URL?.trim();
+  if (oauthClientId && backchannelUrl) {
+    let parsed: URL;
+    try {
+      parsed = new URL(backchannelUrl);
+    } catch {
+      throw new Error('MCP_BACKCHANNEL_BASE_URL must be an absolute HTTP(S) base URL');
+    }
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      throw new Error('MCP_BACKCHANNEL_BASE_URL must be an HTTP(S) base URL without credentials, query or fragment');
+    }
+    backchannelBaseUrl = parsed.toString().replace(/\/+$/, '');
+  }
+
   const FLOW_TTL_MS = 10 * 60 * 1000;
   const pendingFlows = new Map<string, { redirectUri: string; createdAt: number }>();
 
@@ -285,10 +306,10 @@ export function createOAuthHandler(
     if (req.method === 'GET' && req.url === '/.well-known/oauth-authorization-server') {
       const metadata = {
         issuer: baseUrl,
-        // Point both endpoints at our proxy so we can substitute redirect_uri transparently.
+        // The browser uses the public endpoint; back-channel clients may use an internal route.
         authorization_endpoint: `${baseUrl}/oauth/authorize`,
-        token_endpoint: `${baseUrl}/oauth/token`,
-        registration_endpoint: `${baseUrl}/oauth/register`,
+        token_endpoint: `${backchannelBaseUrl ?? baseUrl}/oauth/token`,
+        registration_endpoint: `${backchannelBaseUrl ?? baseUrl}/oauth/register`,
         response_types_supported: ['code'],
         grant_types_supported: ['authorization_code', 'refresh_token'],
         code_challenge_methods_supported: ['S256'],

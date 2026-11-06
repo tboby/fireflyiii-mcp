@@ -51,6 +51,24 @@ The callback registered in Firefly III remains `https://mcp.example.com/oauth/ca
 Without `FIREFLY_PUBLIC_URL`, authorization redirects use `FIREFLY_URL` as before.
 Use HTTPS for the public URL. HTTP is suitable only for trusted internal networks or loopback.
 
+### Internal OAuth back-channel endpoints
+
+If an MCP client cannot reach the public MCP hostname from its server, set
+`MCP_BACKCHANNEL_BASE_URL` to a URL it can reach. OAuth discovery will advertise
+this URL for token and registration requests; the issuer, authorization endpoint,
+and browser callback remain on `MCP_BASE_URL`.
+
+```yaml
+environment:
+  MCP_BASE_URL: https://mcp.example.com
+  MCP_BACKCHANNEL_BASE_URL: http://fireflyiii-mcp:3000
+```
+
+The client must share a network with the MCP container. HTTP exposes credentials
+and tokens to the network: use HTTPS where possible, or an isolated trusted Docker
+network. Some clients require HTTPS or endpoints on the issuer's origin and may
+reject this split configuration. Existing clients must rediscover the metadata.
+
 ### Limit which tools are loaded
 
 ```bash
